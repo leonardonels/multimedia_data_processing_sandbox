@@ -16,7 +16,6 @@
 int main(int argc, char* argv[])
 {
     /**
-     * pipeline:
      * 1. Check if the correct number of arguments is provided
      * 2. Open the input file for reading
      * 3. Read integers from the input file and store them in a vector
