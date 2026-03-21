@@ -17,15 +17,22 @@
  * each followed by a new line. 
  */
 
- #include <iostream>
- #include <fstream>
- #include <vector>
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cmath>
+#include <string>
+#include <bitset>
 
 using namespace std;
 
 template<typename T>
 int sign(T val) {
     return (T(0) < val) - (val < T(0));
+}
+
+int binary_lenght(int32_t n){
+    return n==0 ? 1 : floor((int)log2(n) + 1);
 }
 
 int encode(char* infile, char* outfile){
@@ -41,10 +48,29 @@ int encode(char* infile, char* outfile){
 
     vector<int32_t> v;
     int32_t n;
-    while(in >> n) v.push_back(2 * abs(n) + (1 + sign<int>(n)) / 2 + (n == 0 ? 1 : 0));
+    while(in >> n) v.push_back(2 * abs(n) + (1 + sign<int32_t>(n)) / 2 + (n == 0 ? 1 : 0));
 
     /* elias coding */
+    int64_t buffer = 0;
+    int bit_count = 0;
+    for(const int32_t num : v){
+        int len = 2 * (binary_lenght(num) - 1) + 1;
+        buffer <<= len;
+        bit_count += len;
+        buffer |= num;
+        while(bit_count >= 8){
+            int64_t out_buffer = buffer;
+            out_buffer >>= bit_count - 8;
+            out.put(static_cast<int8_t>(out_buffer & 0xFF));
+            bit_count -= 8;
+        }
+    }
+    if(bit_count > 0){
+        buffer <<= (8 - bit_count); // shift the remaining bits to the left and fill with 0s
+        out.put(buffer & 0xFF);
+    }
     
+    return 0;
 }
 
 int decode(char* infile, char* outfile){
@@ -57,6 +83,44 @@ int decode(char* infile, char* outfile){
     if(!out){
         exit(1);
     }
+
+    int32_t out_buffer = 0;
+    char buffer = 0;
+    size_t prefix_len = 0;
+    size_t num = 0;
+    size_t len = 0;
+    while(in.read(&buffer, sizeof(int8_t))){
+        for(size_t i = 0; i < 8; i++){
+            if(len == 0){
+                // looking for prefix
+                if((buffer >> (7 - i) & 0x01) != 0x01){
+                    prefix_len++;
+                    continue;
+                }else{
+                    // prefix len found
+                    num = len = prefix_len + 1;
+                }
+            }
+            // len != 0
+            out_buffer <<= 1;
+            out_buffer |= (buffer >> (7 - i)) & 0x01;
+            num--;
+
+            if(num == 0){
+                // reverse mapping
+                int val = 0;
+                if((int)out_buffer%2!=0){
+                    val = ((int)out_buffer - 1) / 2;
+                }else{
+                    val = (int)out_buffer / (-2);
+                }
+                out << val << endl;
+                out_buffer = prefix_len = len = 0;
+            }
+        }
+    }
+
+    return 0;
 }
 
 int main(int argc, char* argv[]){
