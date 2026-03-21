@@ -31,8 +31,13 @@ int sign(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
-int binary_lenght(int32_t n){
-    return n==0 ? 1 : floor((int)log2(n) + 1);
+int binary_length(int32_t n){
+    return n==0 ? 1 : (int)log2(n) + 1;
+    /**
+     * or with __builtin_clz() which counts the number of leading zeros in the binary representation of an integer:
+     * return n == 0 ? 1 : 32 - __builtin_clz(n);
+     * Note: __builtin_clz() is a GCC built-in function and may not be available in all compilers. It also assumes that the input is a 32-bit integer.
+     */
 }
 
 int encode(char* infile, char* outfile){
@@ -54,7 +59,7 @@ int encode(char* infile, char* outfile){
     int64_t buffer = 0;
     int bit_count = 0;
     for(const int32_t num : v){
-        int len = 2 * (binary_lenght(num) - 1) + 1;
+        int len = 2 * (binary_length(num) - 1) + 1;
         buffer <<= len;
         bit_count += len;
         buffer |= num;
@@ -90,23 +95,24 @@ int decode(char* infile, char* outfile){
     size_t num = 0;
     size_t len = 0;
     while(in.read(&buffer, sizeof(int8_t))){
+        unsigned char u_buffer = static_cast<unsigned char>(buffer);
         for(size_t i = 0; i < 8; i++){
             if(len == 0){
                 // looking for prefix
-                if((buffer >> (7 - i) & 0x01) != 0x01){
+                if((u_buffer >> (7 - i) & 0x01) != 0x01){
                     prefix_len++;
                     continue;
                 }else{
                     // prefix len found
-                    num = len = prefix_len + 1;
+                    len = prefix_len + 1;
                 }
             }
             // len != 0
             out_buffer <<= 1;
-            out_buffer |= (buffer >> (7 - i)) & 0x01;
-            num--;
+            out_buffer |= (u_buffer >> (7 - i)) & 0x01;
+            len--;
 
-            if(num == 0){
+            if(len == 0){
                 // reverse mapping
                 int val = 0;
                 if((int)out_buffer%2!=0){
@@ -114,7 +120,7 @@ int decode(char* infile, char* outfile){
                 }else{
                     val = (int)out_buffer / (-2);
                 }
-                out << val << endl;
+                out << val << '\n';
                 out_buffer = prefix_len = len = 0;
             }
         }
